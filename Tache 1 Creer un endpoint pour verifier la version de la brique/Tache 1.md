@@ -105,4 +105,3 @@ class OrDematControllerUnitTest {  // Nom de la classe de test
 
 ---
 
-Si tu veux, je peux t’ajouter une **section "amélioration future"** (lecture dynamique via `application.properties`) ou faire un **vrai fichier `.md` prêt à copier/coller**. Souhaite-tu cela ?
