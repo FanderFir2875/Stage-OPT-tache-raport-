@@ -64,11 +64,13 @@ Cela signifie que PostgreSQL est accessible sur :
 3. Choisir **PostgreSQL**
 4. Renseigner les informations suivantes :
 
+![screenshot Dbeaver](SETUP-CONNEXION.png)
+
 | Champ    | Valeur renseignée |
 | -------- | ----------------- |
 | Host     | `localhost`       |
 | Port     | `5432`            |
-| Database | `sior`          |
+| Database | `sior`            |
 | Username | `sior_adm`        |
 | Password | `"pas de MDP"`    |
 
