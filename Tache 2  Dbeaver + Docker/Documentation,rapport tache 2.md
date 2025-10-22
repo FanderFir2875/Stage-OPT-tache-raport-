@@ -98,7 +98,7 @@ View → Tool Windows → Database → + → PostgreSQL
 
 📌 À ce stade, j’ai choisi d’utiliser uniquement **DBeaver**, qui couvre entièrement l’exploration SQL.
 
-📸 **Capture éventuelle ici (si besoin)**
+![screenshot Dbeaver](IMAGE_PLUGIN.png)
 
 ---
 
@@ -110,9 +110,4 @@ View → Tool Windows → Database → + → PostgreSQL
 
 ---
 
-```
 
----
-
-Veux-tu maintenant que je t’aide à faire **les captures qu’il faut exactement**, avec **quoi montrer à l’écran pour que ça fasse “pro”** dans un rapport ?
-```
