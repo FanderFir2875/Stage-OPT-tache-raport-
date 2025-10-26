@@ -1,107 +1,122 @@
 
+# 📦 Endpoint technique — `/or-demat/version`
+
+## 📝 Description
+
+Avant de commencer les développements métier liés à la **dématérialisation des OR**, il est nécessaire d’exposer un **endpoint simple** permettant d’afficher la **version du module `or-demat`**.
+
+Cet endpoint sert de **point de contrôle technique**, pour vérifier :
+
+- si le module est **présent**
+- si le module est **accessible**
+- si le module est **correctement déployé**
+
 ---
 
-# Documentation — Endpoint `/or-demat/version`
-
-## Description
-
-Avant de commencer les développements métier de la dématérialisation des OR, il est nécessaire d’ajouter un **endpoint simple** permettant d’exposer **la version du module `or-demat`**.
-
-Cet endpoint servira à **vérifier que le module est présent, fonctionnel et bien déployé** dans l’environnement.
-
----
-
-## Détails techniques
+## ⚙️ Détails techniques
 
 | Élément               | Valeur                                                   |
-| --------------------- | -------------------------------------------------------- |
-| **URL**               | `GET /or-demat/version`                                  |
+|-----------------------|----------------------------------------------------------|
+| **URL**               | `GET /api/or-demat/version`                              |
 | **Contrôleur**        | `OrDematController`                                      |
-| **Package**           | `nc.opt.psp.web.rest.ordemat`                            |
-| **Format de réponse** | JSON                                                     |
-| **Version**           | *retournée en dur pour cette première étape* (`"1.0.0"`) |
+| **Package**           | `nc.opt.sior.web.rest`                                   |
+| **Format de réponse** | `application/json`                                       |
+| **Version**           | retournée en dur pour cette première étape (`"1.0.0"`)   |
 
-### Exemple de réponse JSON
+### ✅ Exemple de réponse JSON
 
 ```json
 {
   "module": "or-demat",
   "version": "1.0.0"
 }
-```
+````
 
 ---
 
-## Le Contrôleur
-Ce fichier expose un endpoint HTTP accessible publiquement. Il permet de retourner la version actuelle du module or-demat. C’est ce que les autres applications ou développeurs pourront appeler pour vérifier si le module est bien en place.
+## 🧠 Implémentation — Contrôleur
+
+Ce contrôleur expose l’endpoint HTTP accessible publiquement, et retourne la version actuelle du module.
 
 ```java
-package nc.opt.psp.web.rest.ordemat;     // Définit le "dossier logique" du fichier (package Java)
+package nc.opt.sior.web.rest;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import java.util.Map;
 
-import org.springframework.http.ResponseEntity;     // Permet de renvoyer une réponse HTTP propre (200, JSON, etc.)
-import org.springframework.web.bind.annotation.GetMapping;  // Pour déclarer une route HTTP GET
-import org.springframework.web.bind.annotation.RestController;  // Indique que cette classe expose des endpoints REST
-import java.util.Map;  // Permet de créer un objet JSON simple sous forme clé/valeur
+@RequestMapping("/api") // Préfixe URL commun
+@RestController
+public class OrDematController {
 
-@RestController  // Déclare cette classe comme un contrôleur REST géré par Spring Boot
-public class OrDematController {  // Nom de la classe (doit commencer par une Majuscule)
-
-    @GetMapping("/or-demat/version")  // Spécifie l’URL de l’endpoint → accessible via GET
-    public ResponseEntity<Map<String, String>> getVersion() {  // Méthode appelée quand on accède à l'URL
-
-        Map<String, String> response = Map.of(  // Création d’un petit JSON immuable
-            "module", "or-demat",  // Clé "module" → valeur "or-demat"
-            "version", "1.0.0"     // Clé "version" → valeur "1.0.0" (en dur pour l’instant)
+    @GetMapping("/or-demat/version")
+    public ResponseEntity<Map<String , String>> getVersion() {
+        Map<String, String> response = Map.of(
+            "module", "or-demat",
+            "version", "1.0.0"
         );
-
-        return ResponseEntity.ok(response);  // Retourne HTTP 200 OK + le JSON dans le corps de la réponse
+        return ResponseEntity.ok(response);
     }
 }
-
 ```
 
 ---
 
-## Test unitaire
-Ce fichier sert à vérifier automatiquement que le contrôleur fonctionne correctement.
-Il valide que le JSON retourné contient bien le module et la version attendue.
-Cela garantit que si quelqu’un casse ce comportement plus tard, le test le détectera immédiatement.
+## 🔓 Configuration de sécurité
+
+Ajout dans le `SecurityConfiguration` pour autoriser l’accès **SANS AUTHENTIFICATION** à cet endpoint uniquement.
+
 ```java
-package nc.opt.psp.web.rest.ordemat;  // Même package que le contrôleur pour rester organisé
+.antMatchers("/api/or-demat/version").permitAll()
+```
 
-import org.junit.jupiter.api.Test;  // Annotation pour indiquer une méthode de test
-import static org.assertj.core.api.Assertions.assertThat;  // Pour faire des vérifications lisibles (assertions)
-import java.util.Map;  // Pour gérer la réponse JSON sous forme clé/valeur
+*(Ajouté avant le `antMatchers("/api/**").authenticated()` pour ne pas être bloqué)*
 
-class OrDematControllerUnitTest {  // Nom de la classe de test
+---
 
-    @Test  // Indique à JUnit que ceci est un test automatisé
-    void shouldReturnCorrectVersion() {  // Nom du test → décrit clairement l’intention
+## ✅ Test unitaire
 
-        OrDematController controller = new OrDematController();  // On instancie le contrôleur manuellement (pas besoin de Spring)
+Ce test vérifie que l’endpoint retourne bien le JSON attendu avec un `HTTP 200 OK`.
 
-        var response = controller.getVersion().getBody();  // On exécute la méthode, et on récupère SEULEMENT le JSON
+```java
+package nc.opt.sior.web.rest;
 
-        assertThat(response).isNotNull();  // Vérifie que la réponse n’est pas vide
-        assertThat(response.get("module")).isEqualTo("or-demat");  // Vérifie que "module" == "or-demat"
-        assertThat(response.get("version")).isEqualTo("1.0.0");  // Vérifie que "version" == "1.0.0"
+import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
+class OrDematControllerTest {
+
+    private final MockMvc mockMvc = MockMvcBuilders
+        .standaloneSetup(new OrDematController())
+        .build();
+
+    @Test
+    void shouldReturnVersionSuccessfully() throws Exception {
+        mockMvc.perform(get("/api/or-demat/version"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.module").value("or-demat"))
+            .andExpect(jsonPath("$.version").value("1.0.0"));
     }
 }
-
 ```
 
 ---
 
-## Critères d’acceptation
+## ✅ Critères d’acceptation
 
-| Critère                                                                   | Statut |
-| ------------------------------------------------------------------------- | ------ |
-| **L’endpoint `/or-demat/version` est accessible sans authentification**   | ✅      |
-| **Retourne un code HTTP `200 OK`**                                        | ✅      |
-| **Retourne un JSON contenant `module` et `version`**                      | ✅      |
-| **La réponse contient les valeurs correctes (`"or-demat"` et `"1.0.0"`)** | ✅      |
-| **Un test unitaire valide ce comportement**                               | ✅      |
+| Critère                                                       | Statut |
+| ------------------------------------------------------------- | ------ |
+| Endpoint accessible sans authentification                     | ✅      |
+| Retourne un code HTTP `200 OK`                                | ✅      |
+| Retourne un JSON contenant `module` et `version`              | ✅      |
+| Les valeurs correspondent bien à `"or-demat"` et `"1.0.0"`    | ✅      |
+| Test unitaire validant le comportement présent et fonctionnel | ✅      |
 
----
+
 
