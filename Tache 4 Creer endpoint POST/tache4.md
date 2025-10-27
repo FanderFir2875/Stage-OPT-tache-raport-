@@ -122,7 +122,7 @@ Body → `raw` → `JSON`
 
 ---
 
-## ✅ Résultat attendu
+## Résultat attendu
 
 | Scénario                             | Réponse                           |
 | ------------------------------------ | --------------------------------- |
@@ -141,18 +141,34 @@ Exemple succès :
 
 ## Screenshots de resultats
 
-le json a bien été créer.
+**Le JSON a bien été créé :**
+
 ![screenshot 1](screenshots/Scenario1.png)
 
-Erreur 1: Date de debut manquante
+---
+
+**Erreur 1 : Date de début manquante**
+
 ![screenshot 2](screenshots/Erreur1.png)
 
-Erreur 2: Date de fin manquante
+---
+
+**Erreur 2 : Date de fin manquante**
+
 ![screenshot 3](screenshots/Erreur2.png)
 
-Erreur 3: Mauvais format de date
+---
+
+**Erreur 3 : Mauvais format de date**
+
 ![screenshot 4](screenshots/Erreur3.png)
+
 ![screenshot 5](screenshots/Erreur4.png)
 
-Erreur 4 : Date de fin est avant date de debut 
+---
+
+**Erreur 4 : Date de fin avant date de début**
+
 ![screenshot 5](screenshots/Erreur5.png)
+
+---
