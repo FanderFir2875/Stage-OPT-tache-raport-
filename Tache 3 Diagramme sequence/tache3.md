@@ -49,3 +49,46 @@ Ce diagramme permet de visualiser :
 Il prouve que **chaque couche joue correctement son rôle**, et garantit que **l’application est scalable, maintenable et testable**.
 
 
+## Annexe
+
+le code pour le diagramme dans mermaid live editor 
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    actor U as Utilisateur
+    participant F as Front-End (Angular)
+    participant C as OrDematResource (Controller REST)
+    participant S as OrDematService
+    participant R as OrDematRepository
+    participant DB as PostgreSQL
+
+    U->>F: Clique sur "Créer un OR dématérialisé"
+    F->>C: POST /api/or-demat (données OR)
+    activate C
+
+    C->>S: createOrDemat(orDematDTO)
+    activate S
+
+    S->>R: save(orDematEntity)
+    activate R
+
+    R->>DB: INSERT INTO ordre_reexpedition ...
+    DB-->>R: OK (ligne insérée)
+    deactivate R
+
+    R-->>S: OrDematEntity persisté
+    deactivate S
+
+    S-->>C: Confirmation de création (succès)
+    deactivate C
+
+    C-->>F: HTTP 200 OK + "Ordre de réexpédition créé avec succès"
+    F-->>U: Message de validation affiché
+
+```
+
+## diagramme de séquence — OR Démat (Création)
+
+![Diagramme OR-DEMAT](Diagrame.png)
