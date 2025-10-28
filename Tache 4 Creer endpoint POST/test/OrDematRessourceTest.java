@@ -10,10 +10,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class OrDematRessourceTest {
+class OrDematResourceTest {
 
     private final MockMvc mvc = MockMvcBuilders
-        .standaloneSetup(new OrDematRessource())
+        .standaloneSetup(new OrDematResource())
         .build();
 
     private final ObjectMapper om = new ObjectMapper();
@@ -32,13 +32,24 @@ class OrDematRessourceTest {
 
     @Test
     void create_shouldReturn400_whenMissingDateFin() throws Exception {
-        var dto = new OrDematDTO("2025-02-01", null);
+        var dto = new OrDematDTO("2025-03-01", null);
         mvc.perform(post("/api/or-demat")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(om.writeValueAsString(dto)))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("dateFin est obligatoire"));
     }
+
+    @Test
+    void create_shouldReturn400_whenMissingDateDebut() throws Exception {
+        var dto = new OrDematDTO(null, "2025-03-01");
+        mvc.perform(post("/api/or-demat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(om.writeValueAsString(dto)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("dateDebut est obligatoire"));
+    }
+
 
     @Test
     void create_shouldReturn400_whenBadFormat() throws Exception {
@@ -49,3 +60,6 @@ class OrDematRessourceTest {
             .andExpect(status().isBadRequest());
     }
 }
+
+
+
