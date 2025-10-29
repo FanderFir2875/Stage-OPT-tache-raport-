@@ -84,4 +84,13 @@ Commande utilisée pour **synchroniser tout le contenu de la base**, sans rejoue
 ./gradlew liquibaseUpdate
 ```
 ![bdd comfirmation](demande_or_comfirmation.png)
+
 ---
+
+## Étape D — Intégration du Repository
+
+Création du repository `DemandeOrRepository` dans le package `nc.opt.sior.repository` :
+
+```java
+
+```
