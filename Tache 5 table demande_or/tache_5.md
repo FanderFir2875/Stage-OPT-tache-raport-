@@ -92,5 +92,14 @@ Commande utilisée pour **synchroniser tout le contenu de la base**, sans rejoue
 Création du repository `DemandeOrRepository` dans le package `nc.opt.sior.repository` :
 
 ```java
+package nc.opt.sior.repository;
+
+import nc.opt.sior.domain.DemandeOr;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface DemandeOrRepository extends JpaRepository<DemandeOr, Long> {
+}
 
 ```
