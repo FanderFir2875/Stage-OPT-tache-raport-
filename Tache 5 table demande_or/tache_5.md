@@ -90,6 +90,8 @@ Commande utilisée pour **synchroniser tout le contenu de la base**, sans rejoue
 ## Étape D — Intégration du Repository
 
 Création du repository `DemandeOrRepository` dans le package `nc.opt.sior.repository` :
+**Fichier** :
+`src/main/java/nc/opt/sior/repository/DemandeOrRepository.java`
 
 ```java
 package nc.opt.sior.repository;
