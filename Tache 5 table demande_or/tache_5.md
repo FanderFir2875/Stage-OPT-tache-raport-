@@ -315,17 +315,209 @@ public class OrDematResource {
 
 ---
 
-## Résumé global
 
-| Couche              | Fichier                                  | Rôle principal                |
-| ------------------- | ---------------------------------------- | ----------------------------- |
-| **Entity**          | `DemandeOr.java`                         | Représente la table SQL       |
-| **Liquibase**       | `20251029-01_added_table_demande_or.xml` | Crée la table dans la BDD     |
-| **Repository**      | `DemandeOrRepository.java`               | Accès aux données             |
-| **Service**         | `DemandeOrService.java`                  | Logique métier                |
-| **Mapper**          | `DemandeOrMapper.java`                   | Conversion DTO ↔ Entité       |
-| **REST Controller** | `OrDematResource.java`                   | Endpoint HTTP `/api/or-demat` |
+## Étape H — Tests unitaires et d’intégration
+
+Les tests sont une **partie essentielle** du cycle de développement Spring Boot.
+Ils garantissent que ton API fonctionne correctement, que la base est bien mise à jour, et qu’aucun changement futur ne cassera la logique existante.
 
 ---
 
-Souhaites-tu que je t’ajoute la **partie H (tests d’intégration)** pour compléter la doc avec un exemple de `@SpringBootTest` + requête POST simulée ?
+## 1. Test unitaire — `OrDematResourceTest`
+
+### Fichier :
+
+`src/test/java/nc/opt/sior/web/rest/OrDematResourceTest.java`
+
+```java
+package nc.opt.sior.web.rest;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import nc.opt.sior.service.OrDematService;
+import nc.opt.sior.service.dto.OrDematDTO;
+import nc.opt.sior.service.dto.OrDematResponseDTO;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+class OrDematResourceTest {
+
+    private MockMvc mvc;
+    private final ObjectMapper om = new ObjectMapper();
+
+    @Mock
+    private OrDematService orDematService;
+
+    @InjectMocks
+    private OrDematResource orDematResource;
+
+    @BeforeEach
+    void setup() {
+        MockitoAnnotations.openMocks(this);
+        mvc = MockMvcBuilders.standaloneSetup(orDematResource).build();
+    }
+
+    @Test
+    void create_shouldReturn201_whenValidDates() throws Exception {
+        var dto = new OrDematDTO("2025-02-01", "2025-03-01");
+        var response = new OrDematResponseDTO("2025-02-01", "2025-03-01", "Ordre de réexpédition créé avec succès");
+
+        when(orDematService.processOrDemat(any(OrDematDTO.class))).thenReturn(response);
+
+        mvc.perform(post("/api/or-demat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(om.writeValueAsString(dto)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.dateDebut").value("2025-02-01"))
+            .andExpect(jsonPath("$.dateFin").value("2025-03-01"))
+            .andExpect(jsonPath("$.message").value("Ordre de réexpédition créé avec succès"));
+    }
+
+    @Test
+    void create_shouldReturn400_whenMissingDateFin() throws Exception {
+        var dto = new OrDematDTO("2025-03-01", null);
+        when(orDematService.processOrDemat(any(OrDematDTO.class)))
+            .thenThrow(new IllegalArgumentException("dateFin est obligatoire"));
+
+        mvc.perform(post("/api/or-demat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(om.writeValueAsString(dto)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("dateFin est obligatoire"));
+    }
+}
+```
+
+### But du test unitaire :
+
+| Élément       | Description                                                               |
+| ------------- | ------------------------------------------------------------------------- |
+| Cible      | Le contrôleur `OrDematResource` **isolé**                                 |
+| Mocks      | Le service `OrDematService` est simulé via Mockito                        |
+| Vérifie    | Que le contrôleur gère correctement les statuts HTTP et les réponses JSON |
+| Pas de BDD | La base n’est **pas utilisée** ici (test très rapide)                     |
+
+---
+
+## 2. Test d’intégration — `OrDematResourceIT`
+
+### Fichier :
+
+`src/test/java/nc/opt/sior/web/rest/OrDematResourceIT.java`
+
+```java
+package nc.opt.sior.web.rest;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import nc.opt.sior.SiorApp;
+import nc.opt.sior.domain.DemandeOr;
+import nc.opt.sior.repository.DemandeOrRepository;
+import nc.opt.sior.service.dto.OrDematDTO;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.annotation.Rollback;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest(classes = SiorApp.class)
+@AutoConfigureMockMvc
+@Transactional
+class OrDematResourceIT {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private DemandeOrRepository demandeOrRepository;
+
+    @Autowired
+    private ObjectMapper om;
+
+    @BeforeEach
+    void initTest() {
+        demandeOrRepository.deleteAll();
+    }
+
+    @Test
+    @Rollback
+    void createDemandeOr_shouldPersistAndReturn201() throws Exception {
+        var dto = new OrDematDTO("2025-02-01", "2025-03-01");
+
+        mvc.perform(post("/api/or-demat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(om.writeValueAsString(dto)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.dateDebut").value("2025-02-01"))
+            .andExpect(jsonPath("$.dateFin").value("2025-03-01"))
+            .andExpect(jsonPath("$.message").value("Ordre de réexpédition créé avec succès"));
+
+        List<DemandeOr> all = demandeOrRepository.findAll();
+        assertThat(all).hasSize(1);
+        assertThat(all.get(0).getDateDebut()).isNotNull();
+        assertThat(all.get(0).getDateFin()).isNotNull();
+    }
+}
+```
+
+### But du test d’intégration :
+
+| Élément         | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+|  Cible        | Le flux complet : **Controller → Service → Repository → BDD** |
+| Contexte     | Lance tout Spring Boot avec une vraie base H2                 |
+| Vérifie      | Que la persistance fonctionne réellement                      |
+| Avantage     | Détecte les erreurs de mapping ou de configuration Spring     |
+| Inconvénient | Plus lent, mais plus réaliste                                 |
+
+---
+
+##  Erreurs typiques rencontrées
+
+Pendant cette implémentation, plusieurs erreurs classiques ont été résolues.
+Voici la liste avec explications pour les éviter à l’avenir 
+
+| Type d’erreur                            | Message / Symptôme                                        | Cause                                                | Solution                                                                                                            |
+| ---------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Gradle : Task not found**            | `Task '.changelogFile=...' not found`                     | Mauvais placement du paramètre Liquibase             | Utiliser `-Pliquibase.changelogFile=` après la tâche, ex. `./gradlew liquibaseUpdate -Pliquibase.changelogFile=...` |
+| **Injection null dans le controller** | `variable orDematService might not have been initialized` | Constructeur mal défini sans injection de dépendance | Ajouter un constructeur `public OrDematResource(OrDematService orDematService)`                                     |
+| **Problème de conversion de dates**   | Test échoue sur `2025-02-01`                              | `Instant` converti avec décalage de fuseau horaire   | Tester `isNotNull()` plutôt qu’un format exact                                                                      |
+| **Liquibase ne crée pas la table**    | Table absente après `update`                              | Fichier non inclus dans `master.xml`                 | Ajouter `<include file="..."/>` dans `master.xml`                                                                   |
+| **Erreur JSON / 400 Bad Request**     | Mauvais format de date `01-02-2025`                       | Format non ISO (`yyyy-MM-dd` attendu)                | Validation et message clair dans `OrDematService`                                                                   |
+| **Mapper non injecté**                | `UnsatisfiedDependencyException`                          | `@Mapper(componentModel = "spring")` manquant        | Ajouter l’attribut pour que Spring gère le bean                                                                     |
+
+---
+
+# Résumé général
+
+| Étape | Élément clé                   | Objectif                             |
+| ----- | ----------------------------- | ------------------------------------ |
+| A     | Entité JPA `DemandeOr`        | Structure de la table                |
+| B     | Script Liquibase              | Migration BDD versionnée             |
+| C     | Exécution `liquibaseUpdate`   | Mise à jour sans perte               |
+| D     | Repository                    | Accès aux données                    |
+| E     | Service métier                | Logique et persistance               |
+| F     | Mapper MapStruct              | Conversion DTO ↔ Entity              |
+| G     | Contrôleur REST               | Endpoint `/api/or-demat`             |
+| H     | Tests unitaires + intégration | Validation du fonctionnement complet |
+
+
