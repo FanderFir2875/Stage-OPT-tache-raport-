@@ -1,8 +1,9 @@
-# Explication du diagramme de séquence — OR Démat (Création)
 
-Ce diagramme représente **le parcours complet d'une création d’Ordre de Réexpédition dématérialisé (OR-Démat)** dans le SIOR.
 
-Il illustre **les échanges entre chaque couche technique**, depuis l’action de l’utilisateur jusqu’à l’enregistrement en base de données.
+# Explication du diagramme de séquence — OR Définitif (Création)
+
+Ce diagramme représente **le parcours complet de création d’un Ordre de Réexpédition Définitif (OR-Démat)** dans le SIOR.  
+Il illustre les **échanges entre les différentes couches techniques**, depuis l’action de l’utilisateur jusqu’à la persistance de la demande en base de données (`demande_or`).
 
 ---
 
@@ -10,48 +11,95 @@ Il illustre **les échanges entre chaque couche technique**, depuis l’action d
 
 | Acteur | Rôle |
 |--------|------|
-| **Utilisateur** | Interagit depuis l’interface web |
-| **Front-End (Angular)** | Envoie la requête HTTP au back-end REST |
-| **OrDematResource** | Contrôleur REST Spring Boot (reçoit l’API) |
-| **OrDematService** | Contient la **logique métier** de l’OR |
-| **OrDematRepository** | Fait les accès directs à la base de données |
-| **PostgreSQL** | Base de données où l’OR est enregistré |
+| **Utilisateur** | Déclenche la création de l’OR définitif depuis l’interface web |
+| **Front-End (Angular)** | Envoie la requête HTTP POST vers le back-end |
+| **OrDematResource** | Contrôleur REST Spring Boot, point d’entrée `/api/or-demat` |
+| **OrDematService** | Service métier principal orchestrant la création |
+| **DemandeOrService** | Service métier spécifique à la gestion de l’OR définitif |
+| **DemandeOrMapper** | Assure la conversion DTO ↔ Entité |
+| **DemandeOrRepository** | Gère les opérations JPA/Hibernate vers la table `demande_or` |
+| **PostgreSQL** | Base de données relationnelle où est stockée la demande d’OR |
 
 ---
 
-## Déroulement de l’échange (étape par étape)
+## Déroulement du traitement (étape par étape)
 
-1. **L'utilisateur clique sur “Créer un OR dématérialisé”**  
-2. Le **Front Angular envoie une requête REST** :  
-   → `POST /api/or-demat` avec les données de l’OR  
-3. Le **Contrôleur `OrDematResource` reçoit la requête**  
-   → il ne contient aucune logique métier : il **transfère au Service**  
-4. Le **Service `OrDematService` prépare et valide les données**  
-   → puis appelle le Repository pour enregistrer en base  
-5. Le **Repository `OrDematRepository` exécute un INSERT SQL**  
-   → enregistre réellement l’OR dans PostgreSQL  
-6. **La base confirme la sauvegarde** → retour successif Repository → Service → Controller  
-7. Le **Controller renvoie une réponse HTTP 200 OK**  
-   → exemple : `"Ordre de réexpédition créé avec succès"`  
-8. Le **Front affiche un message de confirmation à l’utilisateur**
+1. **L’utilisateur clique sur “Créer un OR définitif”**  
+   → L’action démarre depuis l’interface Angular.  
+
+2. Le **Front-End (Angular)** envoie la requête REST :  
+   → `POST /api/or-demat` avec un corps JSON conforme à `OrDematDTO`.
+
+3. Le **contrôleur `OrDematResource`** reçoit la requête.  
+   → Il effectue une validation des champs d’entrée (adresse, justificatif, identifiant client…).  
+   → Puis il appelle la méthode `createOrDemat()` du service.  
+
+4. Le **`OrDematService`** transforme le DTO en entité via le `DemandeOrMapper` :
+   ```java
+   DemandeOr demandeOr = demandeOrMapper.toEntity(orDematDTO);
+5. Le service délègue ensuite la création à la logique métier `DemandeOrService.processCreation()`.
+
+6. Le **`DemandeOrService`** effectue les vérifications métiers :
+
+   * Absence d’un OR déjà actif pour le client,
+   * Validité du justificatif,
+   * Cohérence des adresses (origine/destination).
+
+7. Si les validations sont conformes, le **`DemandeOrRepository`** enregistre la demande :
+
+   ```sql
+   INSERT INTO demande_or (...)
+   ```
+
+   → Le statut initial est défini à `EN_ATTENTE_VALIDATION`.
+
+8. **PostgreSQL** confirme l’insertion (OK).
+   → L’entité persistée (avec son `id` et son statut) est renvoyée au service.
+
+9. Le **mapper** reconvertit l’entité persistée en `OrDematResponseDTO`.
+
+10. Le **contrôleur `OrDematResource`** renvoie la réponse HTTP :
+    → `HTTP 201 Created` avec le `OrDematResponseDTO`.
+
+11. Le **Front-End Angular** affiche à l’utilisateur :
+
+    > *“Demande d’OR définitif enregistrée avec succès”*
 
 ---
 
 ## En résumé
 
-Ce diagramme permet de visualiser :
+Ce diagramme démontre :
 
-- **le flux complet de la requête**
-- **la séparation claire des responsabilités** (*Controller → Service → Repository → Database*)
-- **l’absence totale de logique métier dans le Controller**
-- **la conformité à une architecture Spring Boot propre (REST + Service + JPA)**
+* La **séparation claire des responsabilités** : *Controller → Service → Repository → Database*
+* L’ajout d’une **couche métier intermédiaire (`DemandeOrService`)** dédiée à la validation et cohérence métier.
+* Une **traçabilité complète** depuis la requête utilisateur jusqu’à la persistance de la donnée.
+* Le respect des bonnes pratiques Spring Boot :
 
-Il prouve que **chaque couche joue correctement son rôle**, et garantit que **l’application est scalable, maintenable et testable**.
+  * Contrôleur sans logique métier
+  * DTOs gérés via Mapper
+  * Services responsables des règles métiers
+  * Repositories dédiés à la persistence
 
+---
 
-## Annexe
+## Points clés techniques
 
-le code pour le diagramme dans mermaid live editor 
+* **Statut initial** de la demande : `EN_ATTENTE_VALIDATION`
+* **Entité cible en base** : `demande_or`
+* **Endpoint utilisé** : `POST /api/or-demat`
+* **Réponse HTTP** : `201 Created + OrDematResponseDTO`
+* **Tests d’intégration associés** : `OrDematResourceIT`
+
+---
+
+## Diagramme de séquence — Création OR Définitif
+
+![Diagramme OR Définitif - Création](diagrammev3.png)
+
+---
+
+## Code du diagramme (Mermaid)
 
 ```mermaid
 sequenceDiagram
@@ -61,34 +109,41 @@ sequenceDiagram
     participant F as Front-End (Angular)
     participant C as OrDematResource (Controller REST)
     participant S as OrDematService
-    participant R as OrDematRepository
+    participant D as DemandeOrService
+    participant M as DemandeOrMapper
+    participant R as DemandeOrRepository
     participant DB as PostgreSQL
 
-    U->>F: Clique sur "Créer un OR dématérialisé"
-    F->>C: POST /api/or-demat (données OR)
+    U->>F: Clique sur "Créer un OR définitif"
+    F->>C: POST /api/or-demat (OrDematDTO)
     activate C
 
-    C->>S: createOrDemat(orDematDTO)
+    C->>S: createOrDemat(OrDematDTO)
     activate S
 
-    S->>R: save(orDematEntity)
-    activate R
+    S->>M: toEntity(OrDematDTO)
+    M-->>S: DemandeOr (Entity)
 
-    R->>DB: INSERT INTO ordre_reexpedition ...
-    DB-->>R: OK (ligne insérée)
+    S->>D: processCreation(DemandeOr)
+    activate D
+
+    D->>R: save(DemandeOr)
+    activate R
+    R->>DB: INSERT INTO demande_or (...)
+    DB-->>R: OK
     deactivate R
 
-    R-->>S: OrDematEntity persisté
+    D-->>S: DemandeOr persisté (statut “EN_ATTENTE_VALIDATION”)
+    deactivate D
+
+    S->>M: toResponseDTO(DemandeOr)
+    M-->>S: OrDematResponseDTO
+
+    S-->>C: OrDematResponseDTO
     deactivate S
 
-    S-->>C: Confirmation de création (succès)
+    C-->>F: HTTP 201 Created + OrDematResponseDTO
     deactivate C
 
-    C-->>F: HTTP 200 OK + "Ordre de réexpédition créé avec succès"
-    F-->>U: Message de validation affiché
-
+    F-->>U: Message “Demande d’OR définitif enregistrée avec succès”
 ```
-
-## diagramme de séquence — OR Démat (Création)
-
-![Diagramme OR-DEMAT](Diagrame.png)
