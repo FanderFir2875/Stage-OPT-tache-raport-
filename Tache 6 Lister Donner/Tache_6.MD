@@ -1,175 +1,70 @@
-# **Documentation — Données nécessaires à la création d’un OR définitif**
+# Données nécessaires à la création d’un OR définitif
+
+
+
+Documenter l’ensemble des **données nécessaires** à la création d’un **Ordre de Réexpédition (OR) définitif** dans le SIOR.  
+Ce document permet d’assurer la traçabilité des informations entre les couches techniques (Entity, DTO, endpoint) et fonctionnelles (formulaire, validation, cycle de vie).
 
 ---
 
-## **Objectif**
+## Structure générale
 
-> Identifier, documenter et tracer **toutes les données nécessaires** à la création d’un **Ordre de Réexpédition (OR) définitif** dans le système **SIOR**, en précisant :
->
-> * Les champs requis et leurs types
-> * Les sources de données (entité, table, DTO, endpoint)
-> * Les contraintes fonctionnelles et techniques
-> * Les dépendances éventuelles entre champs
+L’OR définitif est représenté dans le système par l’entité `DemandeOr` (table `demande_or`).  
+Cette entité est exposée via le DTO `OrDematDTO` et le service REST `/api/or-demat`.
 
 ---
 
-## **1. Contexte**
+## Tableau récapitulatif des données
 
-Un **Ordre de Réexpédition (OR)** est un contrat postal permettant de rediriger le courrier d’un client vers une nouvelle adresse.
-L’**OR définitif** correspond à la version validée et enregistrée du contrat après saisie complète et vérification.
-
-L’objectif est de garantir :
-
-* la **cohérence des données saisies** (dates, adresses, statut)
-* la **traçabilité complète** du dossier (titulaire, agence, audit)
-* la **sécurisation du stockage** via JPA et Liquibase
-
----
-
-## **2. Structure des données – Vue d’ensemble**
-
-| Source               | Description                                                    |
-| -------------------- | -------------------------------------------------------------- |
-| **`demande_or`**     | Contient les dates et informations de base liées à la demande  |
-| **`contrat`**        | Définit le type, le numéro et le statut de l’OR                |
-| **`personne`**       | Détient les informations du titulaire et des bénéficiaires     |
-| **`adresse`**        | Stocke les adresses d’origine et de destination                |
-| **`agence_postale`** | Identifie l’agence gérant la réexpédition                      |
-| **`auditing`**       | Gère les métadonnées de création/modification                  |
-| **`OrDematDTO`**     | Structure JSON utilisée par le front pour la création initiale |
+| Champ | Description fonctionnelle | Type | Contraintes / Validation | Source technique | Commentaires |
+|--------|----------------------------|-------|---------------------------|------------------|---------------|
+| **id** | Identifiant unique de la demande | `Long` | Auto-généré (`@GeneratedValue`) | Table `demande_or` | Clé primaire |
+| **numeroDemande** | Numéro interne de la demande d’OR | `String` | Unique, généré côté service | `OrDematService` | Sert de référence fonctionnelle |
+| **typeOr** | Type d’OR demandé (TEMPORAIRE / DÉFINITIF) | `String` (Enum) | Non nul | `OrDematDTO` | Fixé à `DEFINITIF` pour ce module |
+| **dateCreation** | Date de création de la demande | `LocalDateTime` | Généré automatiquement | `DemandeOrEntity` / BDD | Renseigné à la persistance |
+| **dateActivation** | Date effective d’activation de la réexpédition | `LocalDate` | Peut être nulle tant que la demande n’est pas validée | `DemandeOrEntity` | Mise à jour à la validation |
+| **dateCloture** | Date de fin de validité / résiliation | `LocalDate` | Optionnelle | `DemandeOrEntity` | Renseignée si clôture manuelle |
+| **statut** | Statut fonctionnel de la demande (`EN_ATTENTE_VALIDATION`, `VALIDÉE`, `ACTIVE`, `CLOTURÉE`) | `String` (Enum) | Non nul, valeur par défaut `EN_ATTENTE_VALIDATION` | `DemandeOrEntity` | Géré par la logique métier |
+| **titulaireNom** | Nom du titulaire de la réexpédition | `String` | Obligatoire | `OrDematDTO` / Front | Renseigné par le client |
+| **titulairePrenom** | Prénom du titulaire | `String` | Obligatoire | `OrDematDTO` / Front | Renseigné par le client |
+| **titulaireIdentifiant** | Identifiant du client dans le SIOR | `String` | Obligatoire, clé étrangère vers le référentiel client | `DemandeOrEntity` | Permet la liaison avec la base client |
+| **adresseOrigine** | Adresse postale initiale du client | `String` | Obligatoire | `OrDematDTO` | Adresse source |
+| **adresseDestination** | Nouvelle adresse de réexpédition (définitive) | `String` | Obligatoire | `OrDematDTO` | Adresse cible |
+| **codeAgenceGestionnaire** | Code de l’agence postale ayant traité la demande | `String` | Obligatoire | `OrDematDTO` / API d’authentification | Déduit de l’utilisateur connecté |
+| **justificatifDomicile** | Référence ou identifiant du document justificatif de domicile | `String` | Obligatoire pour l’activation | `OrDematDTO` | Validé par un agent avant activation |
+| **dateValidation** | Date de validation par un agent | `LocalDateTime` | Nulle avant validation | `DemandeOrEntity` | Renseignée par le back-office |
+| **agentValidation** | Identifiant de l’agent ayant validé la demande | `String` | Optionnelle | `DemandeOrEntity` | Déterminée lors de la validation |
+| **motifCloture** | Raison de la clôture (si applicable) | `String` | Optionnelle | `DemandeOrEntity` | Renseignée lors de la clôture |
+| **commentaire** | Commentaire libre de l’agent ou du client | `String` | Optionnelle | `OrDematDTO` | Utilisé pour suivi interne |
 
 ---
 
-## **3. Tableau détaillé des champs nécessaires à un OR définitif**
+## Champs dérivés ou calculés  --- PAS SUR à vérifier.
 
-| **Nom du champ**        | **Type Java** | **Type SQL**   | **Source**       | **Description fonctionnelle**                       | **Contraintes**          | **Obligatoire** |
-| ----------------------- | ------------- | -------------- | ---------------- | --------------------------------------------------- | ------------------------ | --------------- |
-| `id`                    | `Long`        | `BIGSERIAL`    | `demande_or`     | Identifiant unique de la demande d’OR               | PK                       | ✅               |
-| `dateDebut`             | `Instant`     | `TIMESTAMP`    | `demande_or`     | Début de validité de l’ordre                        | NOT NULL                 | ✅               |
-| `dateFin`               | `Instant`     | `TIMESTAMP`    | `demande_or`     | Fin de validité de l’ordre                          | `> dateDebut`            | ✅               |
-| `typeOr`                | `String`      | `VARCHAR(20)`  | `contrat`        | Type d’ordre : `TEMPORAIRE` / `DEFINITIF`           | Enum                     | ✅               |
-| `nomTitulaire`          | `String`      | `VARCHAR(255)` | `personne`       | Nom du titulaire                                    | NOT NULL                 | ✅               |
-| `prenomTitulaire`       | `String`      | `VARCHAR(255)` | `personne`       | Prénom du titulaire                                 | NOT NULL                 | ✅               |
-| `civilite`              | `String`      | `VARCHAR(10)`  | `personne`       | Civilité (`M`, `Mme`, `Mlle`)                       | Valeur contrôlée         | ❌               |
-| `numContrat`            | `String`      | `VARCHAR(50)`  | `contrat`        | Numéro de contrat OR                                | UNIQUE                   | ✅               |
-| `adresseDepart`         | `String`      | `VARCHAR(255)` | `adresse`        | Adresse actuelle du titulaire                       | NOT NULL                 | ✅               |
-| `adresseDestination`    | `String`      | `VARCHAR(255)` | `adresse`        | Nouvelle adresse de réexpédition                    | NOT NULL                 | ✅               |
-| `codePostalDestination` | `String`      | `VARCHAR(10)`  | `adresse`        | Code postal du lieu de destination                  | Vérifié SIG Postal       | ✅               |
-| `villeDestination`      | `String`      | `VARCHAR(255)` | `adresse`        | Commune de destination                              | —                        | ✅               |
-| `agenceGestionnaire`    | `String`      | `VARCHAR(255)` | `agence_postale` | Agence postale gérant l’ordre                       | FK → `agence_postale.id` | ✅               |
-| `motif`                 | `String`      | `VARCHAR(255)` | `contrat`        | Motif du transfert (facultatif)                     | —                        | ❌               |
-| `resiliationDate`       | `Instant`     | `TIMESTAMP`    | `contrat`        | Date de résiliation si applicable                   | NULLABLE                 | ❌               |
-| `isResilie`             | `Boolean`     | `BOOLEAN`      | `contrat`        | Indicateur de résiliation                           | Default `false`          | ❌               |
-| `statutOr`              | `String`      | `VARCHAR(50)`  | `contrat`        | Statut de l’ordre (`EN_COURS`, `VALIDE`, `RESILIE`) | Enum                     | ✅               |
-| `createdBy`             | `String`      | `VARCHAR(50)`  | `auditing`       | Créateur du dossier                                 | Auto                     | ✅               |
-| `createdDate`           | `Instant`     | `TIMESTAMP`    | `auditing`       | Date de création                                    | Auto                     | ✅               |
-| `lastModifiedBy`        | `String`      | `VARCHAR(50)`  | `auditing`       | Dernier modificateur                                | Auto                     | ❌               |
-| `lastModifiedDate`      | `Instant`     | `TIMESTAMP`    | `auditing`       | Date de modification                                | Auto                     | ❌               |
+| Champ | Source | Détail |
+|--------|---------|--------|
+| **numeroDemande** | Généré automatiquement dans `OrDematService` | Incrément logique ou UUID |
+| **statut** | Défini automatiquement à `EN_ATTENTE_VALIDATION` | Changé via les transitions métier |
+| **dateActivation** | Renseignée uniquement après validation de la demande | Calculée côté service |
+| **dateCloture** | Renseignée à la clôture manuelle ou résiliation | Gérée par `cloturerDemandeOr()` |
 
 ---
 
-## **4. Champs dépendants ou conditionnels**
+## Correspondance technique (couches)
 
-| **Champ**            | **Condition / Dépendance**                       | **Règle**                      |
-| -------------------- | ------------------------------------------------ | ------------------------------ |
-| `resiliationDate`    | Renseigné uniquement si `statutOr = 'RESILIE'`   | Contrôle logique en service    |
-| `motif`              | Facultatif sauf pour certains types de transfert | Déterminé par le front         |
-| `civilite`           | Non bloquant, mais présent dans les courriers    | Normalisé (`M`, `Mme`, `Mlle`) |
-| `agenceGestionnaire` | Dérivée automatiquement via l’adresse postale    | Service SIG / Référentiel      |
-| `isResilie`          | Calculé selon `resiliationDate`                  | Non modifiable côté front      |
-
----
-
-## **5. Schéma logique des sources**
-
-```text
-              +----------------------+
-              | PERSONNE (Titulaire) |
-              +----------+-----------+
-                         |
-                         | nom, prénom, civilité
-                         v
-+-----------+    +-------+-------+     +----------------+
-| DEMANDE_OR| -> | CONTRAT OR   | --> | ADRESSE        |
-| (dates)   |    +-------+-------+     +----------------+
-|           |            |
-|           |            v
-|           |     +----------------+
-|           |     | AGENCE_POSTALE |
-|           |     +----------------+
-|           |
-|           +--> AUDITING (createdBy, createdDate, etc.)
-```
+| Couche | Élément | Description |
+|---------|----------|-------------|
+| **Entity (JPA)** | `DemandeOr` | Représentation persistée dans PostgreSQL |
+| **Repository** | `DemandeOrRepository` | Accès CRUD à la table `demande_or` |
+| **Service** | `OrDematService` | Logique métier : création, validation, activation, clôture |
+| **Mapper** | `OrDematMapper` | Conversion entre `OrDematDTO` ↔ `DemandeOrEntity` |
+| **Controller** | `OrDematResource` | Endpoint REST `/api/or-demat` |
+| **Liquibase** | `20251029-01_added_table_demande_or.xml` | Script de création de la table `demande_or` |
+| **Tests** | `OrDematResourceIT` | Vérifie le flux complet de création et validation |
 
 ---
 
-## **6. Contraintes et règles d’intégrité**
 
-| Type                   | Détail                                                  |
-| ---------------------- | ------------------------------------------------------- |
-| **PK**                 | `id` auto-incrémentée                                   |
-| **FK**                 | `agenceGestionnaire` → `agence_postale.id`              |
-| **FK**                 | `adresseDestination` → `adresse.id`                     |
-| **FK**                 | `titulaire` → `personne.id`                             |
-| **Contraintes métier** | `dateFin > dateDebut`, `numContrat` unique              |
-| **Statuts possibles**  | `EN_COURS`, `VALIDE`, `RESILIE`                         |
-| **Audit**              | Champs `createdBy`, `createdDate` gérés automatiquement |
 
----
 
-## **7. Exemple JSON (Frontend → Backend)**
 
-```json
-{
-  "dateDebut": "2025-02-01",
-  "dateFin": "2025-03-01",
-  "nomTitulaire": "Dupont",
-  "prenomTitulaire": "Marie",
-  "adresseDepart": "12 Rue de la Poste",
-  "adresseDestination": "18 Avenue du Parc",
-  "codePostalDestination": "98800",
-  "villeDestination": "Nouméa",
-  "agenceGestionnaire": "Agence Principale Nouméa",
-  "typeOr": "DEFINITIF"
-}
-```
-
----
-
-## **8. Critères de validation / acceptation**
-
-| Critère                                                     | Attendu | Vérification  |
-| ----------------------------------------------------------- | ------- | ------------- |
-| Tous les champs nécessaires à un OR définitif sont recensés | Oui     | Section 3     |
-| Les sources de données sont identifiées                     | Oui     | Section 2 + 5 |
-| Types et contraintes précisés                               | Oui     | Section 3     |
-| Dépendances documentées                                     | Oui     | Section 4     |
-| Schéma de flux complet                                      | Oui     | Section 5     |
-| Format Confluence prêt à publication                        | Oui     | Ce document   |
-
----
-
-## **9. Étapes suivantes**
-
-| Étape | Action                                                                    |
-| ----- | ------------------------------------------------------------------------- |
-| 1️⃣   | Créer l’entité `OrdreReexpedition` complète avec toutes les relations JPA |
-| 2️⃣   | Mettre à jour le `OrDefinitifDTO` et le `Mapper` associé                  |
-| 3️⃣   | Documenter le nouvel endpoint `/api/or-definitif`                         |
-| 4️⃣   | Préparer les tests d’intégration et de validation métier                  |
-| 5️⃣   | Publier la documentation dans Confluence et notifier l’équipe métier      |
-
----
-
-## **Références techniques**
-
-* 🔗 [Spring Data JPA Documentation](https://spring.io/projects/spring-data-jpa)
-* 🔗 [Liquibase – Database Change Management](https://www.liquibase.org/)
-* 🔗 [MapStruct Mapper Framework](https://mapstruct.org/)
-* 🔗 [JHipster Architecture](https://www.jhipster.tech/architecture/)
-* 🔗 [SIOR – Documentation interne](https://confluence.opt.nc/display/SIOR)
-
----
-
-Souhaites-tu que je t’ajoute, juste après celle-ci, la **fiche complémentaire “Vue de flux des données OR (diagramme UML + mapping DTO ↔ Entité ↔ Table)”**, pour compléter la traçabilité visuelle sur Confluence ?
-Ce serait la *phase 2* logique de cette nouvelle tâche.
