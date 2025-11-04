@@ -1,18 +1,14 @@
-Parfait 👍
-Voici la section **“Documentation Confluence — Traçabilité des données `DemandeOr`”**, prête à copier dans Confluence (présentée comme un article clair et complet, formaté comme le veut JHipster/SIOR).
 
----
+# Documentation Confluence — Traçabilité des données : `DemandeOr`
 
-# 🧾 Documentation Confluence — Traçabilité des données : `DemandeOr`
-
-## 🎯 Objectif
+## Objectif
 
 Cette documentation décrit la **traçabilité complète des données** pour la nouvelle table **`demande_or`** introduite dans SIOR.
 Elle permet de comprendre **où et comment les données sont créées, transformées, stockées et auditées** au sein du système.
 
 ---
 
-## 📊 Donnée principale : `DemandeOr`
+## Donnée principale : `DemandeOr`
 
 ### Description fonctionnelle
 
@@ -25,7 +21,7 @@ Chaque enregistrement correspond à **une demande client** comportant :
 
 ---
 
-## 🧱 Traçabilité technique complète
+## Traçabilité technique complète
 
 | Étape | Couche                | Élément concerné                     | Description                                                              |
 | ----- | --------------------- | ------------------------------------ | ------------------------------------------------------------------------ |
@@ -40,7 +36,7 @@ Chaque enregistrement correspond à **une demande client** comportant :
 
 ---
 
-## 🧩 Détails du modèle de données
+## Détails du modèle de données
 
 ### Schéma SQL (Liquibase)
 
@@ -58,7 +54,7 @@ CREATE TABLE demande_or (
 
 ---
 
-## 🧠 Audit et traçabilité applicative
+## Audit et traçabilité applicative
 
 L’auditing est **hérité automatiquement** de `AbstractAuditingEntity`, qui est déjà intégrée dans l’architecture SIOR.
 
@@ -78,7 +74,7 @@ Ces champs sont automatiquement remplis :
 
 ---
 
-## 🧾 Exemple de traçabilité complète (du front à la base)
+## Exemple de traçabilité complète (du front à la base)
 
 ### Exemple d’appel HTTP :
 
@@ -110,7 +106,7 @@ Content-Type: application/json
 
 | id | date_debut          | date_fin            | created_by | created_date        | last_modified_by | last_modified_date |
 | -- | ------------------- | ------------------- | ---------- | ------------------- | ---------------- | ------------------ |
-| 1  | 2025-02-01 00:00:00 | 2025-03-01 00:00:00 | `adminf`   | 2025-10-30 08:32:15 | *(null)*         | *(null)*           |
+| 1  | 2025-02-01 00:00:00 | 2025-03-01 00:00:00 | `sior`   | 2025-10-30 08:32:15 | *(null)*         | *(null)*           |
 
 ---
 
@@ -118,14 +114,14 @@ Content-Type: application/json
 
 | Contrôle                   | Moyen de vérification                              | Emplacement                              |
 | -------------------------- | -------------------------------------------------- | ---------------------------------------- |
-| ✅ Validation des dates     | Logs + test OrDematResourceIT                      | `nc.opt.sior.web.rest.OrDematResourceIT` |
-| ✅ Persistance effective    | Vérification en base (table `demande_or`)          | PostgreSQL / DBeaver                     |
-| ✅ Auditing actif           | Présence des colonnes `created_by`, `created_date` | `AbstractAuditingEntity`                 |
-| ✅ Traçabilité front → back | Logs applicatifs + tests d’intégration             | `/api/or-demat`                          |
+| Validation des dates     | Logs + test OrDematResourceIT                      | `nc.opt.sior.web.rest.OrDematResourceIT` |
+| Persistance effective    | Vérification en base (table `demande_or`)          | PostgreSQL / DBeaver                     |
+| Auditing actif           | Présence des colonnes `created_by`, `created_date` | `AbstractAuditingEntity`                 |
+| Traçabilité front → back | Logs applicatifs + tests d’intégration             | `/api/or-demat`                          |
 
 ---
 
-## 🧰 Sources techniques
+## Sources techniques
 
 | Élément        | Chemin du fichier                                                                      |
 | -------------- | -------------------------------------------------------------------------------------- |
@@ -136,16 +132,3 @@ Content-Type: application/json
 | **Controller** | `src/main/java/nc/opt/sior/web/rest/OrDematResource.java`                              |
 | **Tests IT**   | `src/test/java/nc/opt/sior/web/rest/OrDematResourceIT.java`                            |
 
----
-
-## 📋 Conclusion
-
-Cette documentation garantit la **traçabilité complète** du flux de données de la table `demande_or` :
-
-* ✅ Données **validées**, **persistées**, et **auditables**
-* ✅ Conformes à la structure standard JHipster (Repository / Service / Resource)
-* ✅ Couvertes par des **tests automatisés**
-
----
-
-Souhaites-tu que je te fasse suivre directement la **“Annexe pédagogique : Explication des couches Spring Boot et JPA”** juste après cette partie (comme suite logique pour Confluence) ?
