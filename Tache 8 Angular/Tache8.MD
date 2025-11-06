@@ -1,6 +1,6 @@
 # Tâche Front-End – Création de la page Angular “Demande OR”
 
-## 🎯 Objectif général
+## Objectif général
 
 Cette tâche vise à **comprendre et implémenter** le fonctionnement complet d’une nouvelle page Angular, intitulée **“Demande OR”**, dans le cadre du projet **SIOR**.
 Elle a pour but de :
@@ -13,7 +13,7 @@ Même si le contenu de la page est encore vide (simple titre), cette étape vali
 
 ---
 
-## 🧠 Compréhension du contexte
+## Compréhension du contexte
 
 Dans un projet Angular :
 
@@ -25,9 +25,9 @@ L’ensemble fonctionne grâce au **Router d’Angular**, qui gère la navigatio
 
 ---
 
-## 🛠️ Étapes de réalisation et explication détaillée
+## Étapes de réalisation et explication détaillée
 
-### 1️⃣ Création du composant Angular
+### Création du composant Angular
 
 Commande exécutée :
 
@@ -35,7 +35,7 @@ Commande exécutée :
 ng generate component demande-or
 ```
 
-👉 Cette commande crée automatiquement les fichiers suivants :
+Cette commande crée automatiquement les fichiers suivants :
 
 ```
 demande-or/
@@ -62,7 +62,7 @@ Cela permet de **vérifier visuellement** que la page s’affiche bien sans erre
 
 ---
 
-### 2️⃣ Configuration du routing Angular
+### Configuration du routing Angular
 
 Le **routing** est la clé du fonctionnement d’une SPA (Single Page Application).
 Il permet de charger dynamiquement le bon composant selon l’URL, **sans recharger la page complète**.
@@ -91,11 +91,11 @@ RouterModule.forRoot(
 * `{ enableTracing: DEBUG_INFO_ENABLED }` : active un suivi dans la console pour déboguer les routes.
 
 Résultat attendu :
-👉 Naviguer vers `http://localhost:9000/demande-or` affiche directement la page “Demande OR”.
+Naviguer vers `http://localhost:XXXX/demande-or` affiche directement la page “Demande OR”.
 
 ---
 
-### 3️⃣ Intégration dans la barre de navigation (Navbar)
+### Intégration dans la barre de navigation (Navbar)
 
 Ajout du lien dans `navbar.component.html` :
 
@@ -117,7 +117,7 @@ Ajout du lien dans `navbar.component.html` :
 
 ---
 
-### 4️⃣ Vérification et exécution du front-end
+### Vérification et exécution du front-end
 
 #### Démarrage en local :
 
@@ -144,7 +144,7 @@ Angular utilise un **proxy** vers `localhost:8080` pour communiquer avec le back
 
 ---
 
-## ✅ Résultat obtenu
+## Résultat obtenu
 
 * La page **“Demande OR”** est maintenant intégrée dans le front Angular.
 * La **navigation entre pages** via la navbar fonctionne.
@@ -153,7 +153,7 @@ Angular utilise un **proxy** vers `localhost:8080` pour communiquer avec le back
 
 ---
 
-## 🧩 Structure finale du code
+## Structure finale du code
 
 ```
 src/
@@ -173,7 +173,7 @@ src/
 
 ---
 
-## 🧠 Synthèse pédagogique – Comment ça marche
+## Synthèse pédagogique – Comment ça marche
 
 | Élément               | Fonction dans Angular                                | Équivalent côté backend                         |
 | --------------------- | ---------------------------------------------------- | ----------------------------------------------- |
@@ -186,7 +186,7 @@ src/
 
 ---
 
-## 📘 Points clés à retenir
+## Points clés à retenir
 
 * Angular est une **SPA (Single Page Application)** : une seule page HTML est chargée, le reste est rendu dynamiquement.
 * Les **routes Angular** remplacent les redirections classiques côté serveur.
@@ -197,7 +197,7 @@ src/
 
 ---
 
-## 📅 Notes techniques et prochaines étapes
+## Notes techniques et prochaines étapes
 
 * **Version Angular :** 15 (via JHipster)
 * **Backend :** Spring Boot 3 – Java 17
