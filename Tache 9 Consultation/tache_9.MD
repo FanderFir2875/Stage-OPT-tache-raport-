@@ -196,13 +196,94 @@ export class ListeOrAdminComponent implements OnInit {
   }
 }
 ```
+---
 
-**Explications :**
+# Explication détaillée du component TypeScript
 
-* `HttpClient` : pour consommer le backend REST.
-* `ngOnInit()` : appelé à l’affichage du composant → déclenche le `GET`.
-* `subscribe()` : permet de recevoir la réponse asynchrone.
-* Les données sont stockées dans `data`, pour affichage dans le template.
+## Explication complète (pédagogique)
+
+### 1. Le rôle du composant
+
+Ce composant :
+
+* contacte le backend
+* récupère la liste des demandes OR
+* les stocke dans `data`
+* et laisse Angular afficher le tableau dans le HTML
+
+### 2. Le décorateur `@Component`
+
+```ts
+@Component({
+  selector: 'app-liste-or-admin',
+  templateUrl: './liste-or-admin.component.html',
+})
+```
+
+* `selector`: nom de la balise HTML du composant (utile seulement si on l’insère manuellement)
+* `templateUrl`: fichier HTML associé
+
+Comme on accède via une route, **le selector n’est pas utilisé directement**.
+
+---
+
+### 3. Injection du HttpClient
+
+```ts
+constructor(private http: HttpClient) {}
+```
+
+Permet d’appeler les API REST du backend.
+
+JHipster configure automatiquement HttpClient dans l'application.
+
+---
+
+### 4. Appel de l’API dans `ngOnInit()`
+
+`ngOnInit()` = méthode appelée quand Angular charge la page.
+
+```ts
+ngOnInit(): void {
+  this.http.get<AdminRow[]>('/api/admin/or-demandes')
+```
+
+Ce `GET` correspond exactement à l’endpoint :
+
+```
+GET /api/admin/or-demandes
+```
+
+---
+
+### 5. Le subscribe()
+
+```ts
+.subscribe({
+  next: rows => (this.data = rows),
+  error: err => console.error(...)
+});
+```
+
+Angular utilise un système d’**Observable** → il faut s’y abonner.
+
+✔ `next:` → la réponse arrive → on met les données dans `this.data`
+✔ `error:` → gestion des erreurs
+
+---
+
+### 6. Le rôle de `data: AdminRow[] = []`
+
+* `data` est un tableau vide au départ
+* Quand le backend répond → rempli avec les résultats
+* Le template utilise `*ngFor="let row of data"`
+
+Angular met automatiquement à jour le DOM (data-binding)
+
+---
+
+
+
 
 ---
 
@@ -294,37 +375,6 @@ Visible uniquement pour les compte ayant les droits `ADMIN_DSI`.
 | `Authority.ADMIN_DSI`    | Constante utilisée pour le contrôle des accès         |
 
 ---
-
-## Résultat final
-
-* Une page `/admin/liste-or` visible uniquement par les administrateurs DSI.
-* Affichage clair et filtré de toutes les demandes OR.
-* Intégration complète front–back.
-* Fonctionnalité testée et compilée avec succès via `npm start` et `./gradlew bootRun`.
-
----
-
-## Structure finale du projet
-
-```
-src/
- ├── main/java/nc/opt/sior/
- │    ├── domain/DemandeOr.java
- │    ├── repository/DemandeOrRepository.java
- │    ├── service/DemandeOrService.java
- │    └── web/rest/OrAdminResource.java
- │
- └── main/webapp/app/
-      ├── liste-or-admin/
-      │    ├── liste-or-admin.component.ts
-      │    ├── liste-or-admin.component.html
-      │    └── liste-or-admin.component.scss
-      ├── layouts/navbar/navbar.component.html
-      └── sior-app-routing.module.ts
-```
-
----
-
 ## Étape complémentaire — Gestion du i18n et corrections front-end
 
 ### Contexte
@@ -494,8 +544,37 @@ utilisé uniquement si la traduction ne se charge pas.
 
 ---
 
-Cette étape complète la tâche **OR-372**, en rendant la page conforme aux standards i18n de JHipster
-et en assurant la cohérence de l’interface utilisateur entre les différentes langues.
+## Résultat final
+
+* Une page `/admin/liste-or` visible uniquement par les administrateurs DSI.
+* Affichage clair et filtré de toutes les demandes OR.
+* Intégration complète front–back.
+* Fonctionnalité testée et compilée avec succès via  `./gradlew bootRun`. (Il n'y a plus besoin de passer par npm start.)
+
+---
+
+## Structure finale du projet
+
+```
+src/
+ ├── main/java/nc/opt/sior/
+ │    ├── domain/DemandeOr.java
+ │    ├── repository/DemandeOrRepository.java
+ │    ├── service/DemandeOrService.java
+ │    └── web/rest/OrAdminResource.java
+ │
+ └── main/webapp/app/
+      ├── liste-or-admin/
+      │    ├── liste-or-admin.component.ts
+      │    ├── liste-or-admin.component.html
+      │    └── liste-or-admin.component.scss
+      ├── layouts/navbar/navbar.component.html
+      └── sior-app-routing.module.ts
+```
+
+
+
+
 
 
 
