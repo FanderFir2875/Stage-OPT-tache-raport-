@@ -125,21 +125,54 @@ public DemandeOrDetailDTO getDetailForAdmin(Long id) {
 
 ---
 
-# 5️ **Création des méthodes utilitaires (mapperAdresse / mapperOptions)**
+# 5️ **Création du mapper JSON → DTO : `DemandeOrJsonMapper`**
 
-On isole la logique de reconstruction des sous-objets JSON → DTO
-Pour éviter des classes trop lourdes, ces méthodes doivent être placées dans un **service dédié** (bonne pratique) :
+Le mapper JSON → DTO est utilisé pour **mapper les données JSON** en **objet de domaine** et **vice versa**.
+Utilisés dans **getDetailForAdmin()**.
+```java
+@Component
+public class DemandeOrJsonMapper {
 
-`service/mapper`
+    public AdresseDTO mapAdresse(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
 
-* `DemandeOrAdresseMapper`
-* `DemandeOrOptionsMapper`
+        AdresseDTO dto = new AdresseDTO();
+        dto.setBp(node.path("bp").asText(null));
+        dto.setAgence(node.path("agence").asText(null));
+        dto.setCodePostal(node.path("codePostal").asText(null));
+        dto.setPointDeRemise(node.path("pointDeRemise").asText(null));
+        dto.setComplement(node.path("complement").asText(null));
+        dto.setNumEtVoie(node.path("numEtVoie").asText(null));
+        dto.setLieuDit(node.path("lieuDit").asText(null));
+        dto.setVille(node.path("ville").asText(null));
+        dto.setPays(node.path("pays").asText(null));
+        dto.setDestination(node.path("destination").asText(null));
+        dto.setDomiciliation(node.path("domiciliation").asText(null));
+        dto.setIdRefLoc(node.path("idRefLoc").asText(null));
+        dto.setTourneeFacteur(node.path("tourneeFacteur").asText(null));
 
-Cela rend le code plus propre, plus testable et plus clair.
+        return dto;
+    }
+
+    public OptionsDTO mapOptions(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+
+        OptionsDTO dto = new OptionsDTO();
+        dto.setBp(node.path("bp").asText(null));
+        dto.setCedex(node.path("cedex").asText(null));
+        dto.setCommentaire(node.path("commentaire").asText(null));
+
+        return dto;
+    }
+}
 
 ---
 
-# 6️⃣ **Modification du repository / service persistence**
+# 6️ **Modification du repository / service persistence**
 
 ### Ajout dans le service
 
@@ -153,7 +186,7 @@ public Optional<DemandeOr> findById(Long id) {
 
 ---
 
-# 7️⃣ **Ajout du nouveau endpoint dans `OrDematResource`**
+# 7️ **Ajout du nouveau endpoint dans `OrDematResource`**
 
 L’objectif : exposer le détail complet d’une demande pour l’admin.
 
@@ -172,7 +205,7 @@ GET /api/demat/or-demandes/{id}
 
 ---
 
-# 8️⃣ **Tests Postman**
+# 8️ **Tests Postman**
 
 Nous avons commencé à tester :
 
@@ -186,7 +219,7 @@ Nous avons commencé à tester :
 
 ---
 
-# 9️⃣ **Préparation Front (à venir)**
+# 9️ **Préparation Front (à venir)**
 
 Dans une 2ème partie, nous devrons :
 
