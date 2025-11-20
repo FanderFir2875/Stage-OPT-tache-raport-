@@ -158,10 +158,16 @@ public Optional<DemandeOr> findById(Long id) {
 L’objectif : exposer le détail complet d’une demande pour l’admin.
 
 ```java
-@GetMapping("/or-demandes/{id}")
-public ResponseEntity<DemandeOrDetailDTO> getDetail(@PathVariable Long id) {
-    return ResponseEntity.ok(orDematService.getDetailForAdmin(id));
-}
+    @GetMapping("/or-demandes/{id}")
+    public ResponseEntity<DemandeOrDetailDTO> getDetail(@PathVariable Long id) {
+        log.debug("REST admin: get detail for OR demande {}", id);
+        try {
+            DemandeOrDetailDTO dto = orDematService.getDetailForAdmin(id);
+            return ResponseEntity.ok(dto);
+        } catch (EntityNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
 ```
 
 ✔ URL REST :
