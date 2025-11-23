@@ -156,28 +156,51 @@ Et ajout dans `global.json` si nécessaire.
 `formulaire-or.component.ts`
 
 ```ts
-import { Component } from '@angular/core';
-import { FormBuilder, Validators } from '@angular/forms';
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 @Component({
-  selector: 'app-formulaire-or',
-  templateUrl: './formulaire-or.component.html',
+selector: 'app-formulaire-or',
+templateUrl: './formulaire-or.component.html',
 })
-export class FormulaireOrComponent {
+export class FormulaireOrComponent implements OnInit {
 
-  constructor(private fb: FormBuilder) {}
+formulaireOr!: FormGroup;
 
-  formulaireOr = this.fb.group({
-    nom: ['', Validators.required],
-    prenom: ['', Validators.required],
-    email: ['', [Validators.required, Validators.email]],
-    adresse: ['', Validators.required],
-  });
+constructor(private fb: FormBuilder) {}
+
+  ngOnInit(): void {
+    this.formulaireOr = this.fb.group({
+      demandeurNom: ['', Validators.required],
+      demandeurPrenom: ['', Validators.required],
+      demandeurEmail: ['', [Validators.required, Validators.email]],
+      demandeurTelephone: [''],
+
+      ancienneAdresse: this.fb.group({
+        numEtVoie: ['', Validators.required],
+        ville: ['', Validators.required],
+        codePostal: ['', Validators.required],
+      }),
+
+      nouvelleAdresse: this.fb.group({
+        numEtVoie: ['', Validators.required],
+        ville: ['', Validators.required],
+        codePostal: ['', Validators.required],
+      }),
+    });
+  }
 
   onSubmit(): void {
-    console.log("📨 Données du formulaire :", this.formulaireOr.value);
+    if (this.formulaireOr.invalid) {
+      this.formulaireOr.markAllAsTouched();
+      return;
+    }
+
+    console.log("✔ Données du formulaire OR :", this.formulaireOr.value);
+    alert("Formulaire soumis ! (phase 1 : mécanique uniquement)");
   }
 }
+
 ```
 
 Fonctionnalités :
