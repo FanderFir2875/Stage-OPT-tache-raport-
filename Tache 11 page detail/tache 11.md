@@ -87,40 +87,41 @@ On ajoute une méthode dans le service métier (orchestration) pour :
 ### Exemple simplifié :
 
 ```java
-public DemandeOrDetailDTO getDetailForAdmin(Long id) {
-    DemandeOr demande = demandeOrService.findById(id)
-        .orElseThrow(() -> new EntityNotFoundException("Demande OR non trouvée : " + id));
+    public DemandeOrDetailDTO getDetailForAdmin(Long id) {
+        DemandeOr demande = demandeOrService.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("Demande OR non trouvée : " + id));
 
-    JsonNode json = demande.getData();
+        JsonNode json = demande.getData();
 
-    DemandeOrDetailDTO dto = new DemandeOrDetailDTO();
-    dto.setId(demande.getId());
-    dto.setStatut(JsonUtils.getStringOrDefault(json, "statut", "INCONNNU"));
+        DemandeOrDetailDTO dto = new DemandeOrDetailDTO();
+        dto.setId(demande.getId());
+        dto.setStatut(JsonUtils.getStringOrDefault(json, "statut", "INCONNNU"));
 
-    // Demandeur
-    dto.setDemandeurNom(JsonUtils.getStringOrDefault(json, "demandeurNom", null));
-    dto.setDemandeurPrenom(JsonUtils.getStringOrDefault(json, "demandeurPrenom", null));
-    dto.setDemandeurEmail(JsonUtils.getStringOrDefault(json, "demandeurEmail", null));
-    dto.setDemandeurTelephone(JsonUtils.getStringOrDefault(json, "demandeurTelephone", null));
+        // Demandeur
+        dto.setDemandeurNom(JsonUtils.getStringOrDefault(json, "demandeurNom", null));
+        dto.setDemandeurPrenom(JsonUtils.getStringOrDefault(json, "demandeurPrenom", null));
+        dto.setDemandeurEmail(JsonUtils.getStringOrDefault(json, "demandeurEmail", null));
+        dto.setDemandeurTelephone(JsonUtils.getStringOrDefault(json, "demandeurTelephone", null));
 
-    // Adresses
-    dto.setAncienneAdresse(mapperAdresse(json.get("ancienneAdresse")));
-    dto.setNouvelleAdresse(mapperAdresse(json.get("nouvelleAdresse")));
+        // Adresses
+        dto.setAncienneAdresse(DemandeOrJsonMapper.mapAdresse(json.get("ancienneAdresse")));
+        dto.setNouvelleAdresse(DemandeOrJsonMapper.mapAdresse(json.get("nouvelleAdresse")));
 
-    // Réexpédition
-    dto.setTypeReexpedition(JsonUtils.getStringOrDefault(json, "typeReexpedition", null));
-    dto.setDateDebut(demande.getDateDebut());
-    dto.setDateFin(demande.getDateFin());
+        // Réexpédition
+        dto.setTypeReexpedition(JsonUtils.getStringOrDefault(json, "typeReexpedition", null));
+        dto.setDateDebut(demande.getDateDebut());
+        dto.setDateFin(demande.getDateFin());
 
-    // Audit JPA
-    dto.setCreatedDate(demande.getCreatedDate());
-    dto.setLastModifiedDate(demande.getLastModifiedDate());
+        // Audit JPA
+        dto.setCreatedDate(demande.getCreatedDate());
+        dto.setLastModifiedDate(demande.getLastModifiedDate());
 
-    // Options
-    dto.setOptions(mapperOptions(json.get("options")));
+        // Options
+        dto.setOptions(DemandeOrJsonMapper.mapOptions(json.get("options")));
 
-    return dto;
-}
+        return dto;
+    }
+    
 ```
 
 ---
