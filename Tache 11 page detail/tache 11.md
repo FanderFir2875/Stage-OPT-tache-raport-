@@ -1,245 +1,258 @@
-#  **Récapitulatif Technique – Fonctionnalité : Consultation complète d’une demande OR (Admin)**
+# **OR-376 : Affichage lisible de la colonne “Demande OR”**
 
 ## **Objectif**
 
-Permettre à un administrateur de consulter **toutes les informations complètes** d’une demande d’Ordre de Réexpédition (OR), telles que saisies dans le formulaire utilisateur.
+Permettre à l’administrateur de visualiser immédiatement les informations essentielles d’une demande d’Ordre de Réexpédition (OR) dans la liste admin, sous une forme lisible et structurée, sans afficher le JSON brut.
 
 Cela inclut :
 
-* Informations du demandeur
+* Type de réexpédition
+* Demandeur
 * Ancienne / nouvelle adresse
-* Paramètres de réexpédition
-* Options (BP / CEDEX / commentaires…)
-* Dates, statut, Audit JPA ,  etc.
+* Dates
+* Durée
+* Synthèse du contenu OR en phrase simple
 
 ---
 
-# **Création du DTO de détail : `DemandeOrDetailDTO`**
+# 1️ **Modification du DTO : `DemandeOrAdminListDTO`**
 
-on crée un DTO dédié pour la vue admin afin d’exposer **toutes** les informations d’une demande OR dans un format lisible.
+Le DTO de la liste admin a été enrichi avec des champs de résumé lisible :
 
 ```java
 @Data
-public class DemandeOrDetailDTO {
-    private long id;
+@NoArgsConstructor
+@AllArgsConstructor
+public class DemandeOrAdminListDTO {
+
+    private Long id;
     private String statut;
+    private Instant createdDate;
+    private Instant lastModifiedDate;
 
-    // Demandeur
-    private String demandeurNom;
-    private String demandeurPrenom;
-    private String demandeurEmail;
-    private String demandeurTelephone;
- 
-    // Adresses
-    private AdresseDTO ancienneAdresse;
-    private AdresseDTO nouvelleAdresse;
-
-
-    // Réexpédition
     private String typeReexpedition;
     private Instant dateDebut;
     private Instant dateFin;
 
+    private String demandeurNom;
+    private String demandeurPrenom;
 
-    // Audit JPA
-    private Instant createdDate;
-    private Instant lastModifiedDate;
+    private String ancienneVille;
+    private String ancienneCodePostal;
+    private String nouvelleVille;
+    private String nouvelleCodePostal;
 
+    // Résumés lisibles utilisés par le front
+    private String resumeType;
+    private String resumeAdresses;
+    private String resumeDuree;
+    private String resumeDates;
+}
+```
 
-    // Options
-    private OptionsDTO options;
+Ce DTO devient la structure principale affichée dans la liste Angular.
+
+---
+
+# 2️ **Lissage des données JSON en DTO lisible**
+
+Dans la méthode backend `listAllForAdmin()` :
+
+### Responsabilité
+
+* Lire le JSON
+* Transformer les données
+* Générer des résumés humains lisibles
+
+```java
+public List<DemandeOrAdminListDTO> listAllForAdmin() {
+    return demandeOrService.findAll().stream()
+        .map(or -> {
+            JsonNode data = or.getData();
+
+            DemandeOrAdminListDTO dto = new DemandeOrAdminListDTO();
+            dto.setId(or.getId());
+            dto.setStatut(JsonUtils.getStringOrDefault(data, "statut", "INCONNU"));
+            dto.setCreatedDate(or.getCreatedDate());
+            dto.setLastModifiedDate(or.getLastModifiedDate());
+
+            dto.setTypeReexpedition(JsonUtils.getStringOrDefault(data, "typeReexpedition", null));
+            dto.setDateDebut(or.getDateDebut());
+            dto.setDateFin(or.getDateFin());
+
+            dto.setDemandeurNom(JsonUtils.getStringOrDefault(data, "demandeurNom", null));
+            dto.setDemandeurPrenom(JsonUtils.getStringOrDefault(data, "demandeurPrenom", null));
+
+            JsonNode ancienne = data.path("ancienneAdresse");
+            dto.setAncienneVille(JsonUtils.getStringOrDefault(ancienne, "ville", null));
+            dto.setAncienneCodePostal(JsonUtils.getStringOrDefault(ancienne, "codePostal", null));
+
+            JsonNode nouvelle = data.path("nouvelleAdresse");
+            dto.setNouvelleVille(JsonUtils.getStringOrDefault(nouvelle, "ville", null));
+            dto.setNouvelleCodePostal(JsonUtils.getStringOrDefault(nouvelle, "codePostal", null));
+
+            // Construction des résumés affichés côté UI
+            dto.setResumeType(buildTypeResume(dto));
+            dto.setResumeAdresses(buildAdresseResume(dto));
+            dto.setResumeDuree(buildDureeResume(dto));
+            dto.setResumeDates(buildDateResume(dto));
+
+            return dto;
+        })
+        .collect(Collectors.toList());
 }
 ```
 
 ---
 
-# 2️ **Création du DTO des options : `OptionsDTO`**
+# 3️ **Construction des résumés lisibles (métier)**
 
-Simplifié pour représenter l’ensemble des choix optionnels utilisateur :
+Ces méthodes produisent un texte lisible.
+
+### Résumé Type
 
 ```java
-@Data
-public class OptionsDTO {
-    private String bp;
-    private String cedex;
-    private String commentaire;
+private String buildTypeResume(DemandeOrAdminListDTO dto) {
+    String type = dto.getTypeReexpedition() != null ? dto.getTypeReexpedition() : "Non spécifié";
+    return "Réexpédition : " + type;
 }
 ```
 
 ---
 
-# 3️ **Réutilisation du DTO existant : `AdresseDTO`**
-
-`AdresseDTO` (Présent dans le projet de base est suffisant) est suffisamment complet pour afficher les informations d’adresse utilisateur.
-
----
-
-# 4️ **Ajout du service métier : `getDetailForAdmin(id)` dans `OrDematService`**
-
-On ajoute une méthode dans le service métier (orchestration) pour :
-
-- Récupérer l'entité complète via `demandeOrService.findById()`
-- Lire les valeurs JSON stockées dans `demande_or.data`
-- Remplir le DTO détaillé avec les données récupérées
-- Retourner un objet nettoyé et lisible pour le front-end
-
-
-### Exemple simplifié :
+### Résumé Adresses
 
 ```java
-    public DemandeOrDetailDTO getDetailForAdmin(Long id) {
-        DemandeOr demande = demandeOrService.findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("Demande OR non trouvée : " + id));
-
-        JsonNode json = demande.getData();
-
-        DemandeOrDetailDTO dto = new DemandeOrDetailDTO();
-        dto.setId(demande.getId());
-        dto.setStatut(JsonUtils.getStringOrDefault(json, "statut", "INCONNNU"));
-
-        // Demandeur
-        dto.setDemandeurNom(JsonUtils.getStringOrDefault(json, "demandeurNom", null));
-        dto.setDemandeurPrenom(JsonUtils.getStringOrDefault(json, "demandeurPrenom", null));
-        dto.setDemandeurEmail(JsonUtils.getStringOrDefault(json, "demandeurEmail", null));
-        dto.setDemandeurTelephone(JsonUtils.getStringOrDefault(json, "demandeurTelephone", null));
-
-        // Adresses
-        dto.setAncienneAdresse(DemandeOrJsonMapper.mapAdresse(json.get("ancienneAdresse")));
-        dto.setNouvelleAdresse(DemandeOrJsonMapper.mapAdresse(json.get("nouvelleAdresse")));
-
-        // Réexpédition
-        dto.setTypeReexpedition(JsonUtils.getStringOrDefault(json, "typeReexpedition", null));
-        dto.setDateDebut(demande.getDateDebut());
-        dto.setDateFin(demande.getDateFin());
-
-        // Audit JPA
-        dto.setCreatedDate(demande.getCreatedDate());
-        dto.setLastModifiedDate(demande.getLastModifiedDate());
-
-        // Options
-        dto.setOptions(DemandeOrJsonMapper.mapOptions(json.get("options")));
-
-        return dto;
-    }
-    
-```
-
----
-
-# 5️ **Création du mapper JSON → DTO : `DemandeOrJsonMapper`**
-
-Le mapper JSON → DTO est utilisé pour **mapper les données JSON** en **objet de domaine** et **vice versa**.
-Utilisés dans **getDetailForAdmin()**.
-```java
-@Component
-public class DemandeOrJsonMapper {
-
-    public AdresseDTO mapAdresse(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-
-        AdresseDTO dto = new AdresseDTO();
-        dto.setBp(node.path("bp").asText(null));
-        dto.setAgence(node.path("agence").asText(null));
-        dto.setCodePostal(node.path("codePostal").asText(null));
-        dto.setPointDeRemise(node.path("pointDeRemise").asText(null));
-        dto.setComplement(node.path("complement").asText(null));
-        dto.setNumEtVoie(node.path("numEtVoie").asText(null));
-        dto.setLieuDit(node.path("lieuDit").asText(null));
-        dto.setVille(node.path("ville").asText(null));
-        dto.setPays(node.path("pays").asText(null));
-        dto.setDestination(node.path("destination").asText(null));
-        dto.setDomiciliation(node.path("domiciliation").asText(null));
-        dto.setIdRefLoc(node.path("idRefLoc").asText(null));
-        dto.setTourneeFacteur(node.path("tourneeFacteur").asText(null));
-
-        return dto;
-    }
-
-    public OptionsDTO mapOptions(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-
-        OptionsDTO dto = new OptionsDTO();
-        dto.setBp(node.path("bp").asText(null));
-        dto.setCedex(node.path("cedex").asText(null));
-        dto.setCommentaire(node.path("commentaire").asText(null));
-
-        return dto;
-    }
-}
-```
----
-
-# 6️ **Modification du repository / service persistence**
-
-### Ajout dans le service
-
-```java
-public Optional<DemandeOr> findById(Long id) {
-    return demandeOrRepository.findById(id);
+private String buildAdresseResume(DemandeOrAdminListDTO dto) {
+    String villeA = dto.getAncienneVille() != null ? dto.getAncienneVille() : "?";
+    String villeN = dto.getNouvelleVille() != null ? dto.getNouvelleVille() : "?";
+    return "Adresse : " + villeA + " → " + villeN;
 }
 ```
 
-### Pas besoin de modifier le repository (hérite déjà de `findById`).
-
 ---
 
-# 7️ **Ajout du nouveau endpoint dans `OrDematResource`**
-
-L’objectif : exposer le détail complet d’une demande pour l’admin.
+### Résumé Durée
 
 ```java
-@GetMapping("/or-demandes/{id}")
-public ResponseEntity<DemandeOrDetailDTO> getDetail(@PathVariable Long id) {
-    log.debug("REST admin: get detail for OR demande {}", id);
-    try {
-        DemandeOrDetailDTO dto = orDematService.getDetailForAdmin(id);
-            return ResponseEntity.ok(dto);
-        } catch (EntityNotFoundException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+private String buildDureeResume(DemandeOrAdminListDTO dto) {
+    if(dto.getDateDebut() != null && dto.getDateFin() != null) {
+        long days = Duration.between(dto.getDateDebut(), dto.getDateFin()).toDays();
+        return "Durée : " + days + " jours";
     }
-```
-
-✔ URL REST :
-
-```
-GET /api/demat/or-demandes/{id}
+    return "Durée inconnue";
+}
 ```
 
 ---
 
-# 8️ **Tests Postman**
+### Résumé Période
 
-Nous avons commencé à tester :
+```java
+private String buildDateResume(DemandeOrAdminListDTO dto) {
+    if(dto.getDateDebut() != null && dto.getDateFin() != null) {
+        return "Période : "
+            + dto.getDateDebut().toString().substring(0, 10)
+            + " → "
+            + dto.getDateFin().toString().substring(0, 10);
+    }
+    return "Période inconnue";
+}
+```
 
-### ✔ `POST /api/demat/or-definitif`
+---
 
-→ insertion OK mais erreurs 500 si format JSON incorrect
+# 4️ **Exposition par endpoint (REST)**
 
-### ✔ `GET /api/demat/or-demande/{id}`
+```java
+@GetMapping("/or-demandes")
+public ResponseEntity<List<DemandeOrAdminListDTO>> listAll() {
+    log.debug("REST admin: list all OR demandes");
+    return ResponseEntity.ok(orDematService.listAllForAdmin());
+}
+```
 
-→ en cours de test maintenant que la structure DTO est en place
+Endpoint :
+
+```
+GET /api/demat/or-demandes
+```
+
+Ce endpoint renvoie directement les infos déjà formatées.
 
 ---
 
-# 9️ **Préparation Front (à venir)**
+# 5️ **Côté Front (Angular)**
 
-Dans une 2ème partie, nous devrons :
+## Type TS aligné sur le DTO backend
 
-1. Ajouter un bouton “Voir détail” dans la liste admin
-2. Créer un composant Angular `DemandeOrDetailComponent`
-3. Appeler le nouveau endpoint
-4. Afficher les données sous forme de blocs structurés
+```ts
+type AdminRow = {
+  id: number;
+  statut: string;
+  createdDate: string;
+  lastModifiedDate: string;
 
-   * Bloc Demandeur
-   * Bloc Adresses
-   * Bloc Paramètres
-   * Bloc Options
-   * Bloc Audit
+  demandeurNom?: string | null;
+  demandeurPrenom?: string | null;
 
+  resumeType?: string | null;
+  resumeAdresses?: string | null;
+  resumeDuree?: string | null;
+  resumeDates?: string | null;
+};
+```
 
 ---
+
+# 6️ **Affichage dans le tableau admin (UI)**
+
+```html
+<td>
+  <div *ngIf="row.demandeurNom || row.demandeurPrenom">
+    👤 {{ row.demandeurNom || 'Demandeur' }} {{ row.demandeurPrenom || '' }}
+  </div>
+  <div *ngIf="row.resumeType">
+    🏷️ {{ row.resumeType }}
+  </div>
+  <div *ngIf="row.resumeAdresses">
+    📍 {{ row.resumeAdresses }}
+  </div>
+  <div *ngIf="row.resumeDuree">
+    ⏳ {{ row.resumeDuree }}
+  </div>
+  <div *ngIf="row.resumeDates">
+    📆 {{ row.resumeDates }}
+  </div>
+</td>
+```
+
+✔ Lecture immédiate par l’admin
+✔ Données lisibles
+✔ Zéro JSON brut affiché
+
+---
+
+# 7️ **Résultat final**
+
+### Avant ❌
+
+```
+{
+ "nom":"Jean",
+ "ville":"Nouméa",
+ "statut":"EN_ATTENTE",
+ ...
+}
+```
+
+### Après ✔
+
+```
+👤 Jean Dupont
+🏷️ Réexpédition : DEFINITIF
+📍 Adresse : Nouméa → Dumbéa
+⏳ Durée : 30 jours
+📆 Période : 2025-11-01 → 2025-12-01
+```
+
