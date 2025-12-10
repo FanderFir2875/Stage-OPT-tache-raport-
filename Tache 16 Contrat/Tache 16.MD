@@ -247,7 +247,70 @@ ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());
 ✔ correction : initialiser systématiquement les booléens
 
 ---
+### Écrasement du statut `DEMANDE_EN_LIGNE`
 
+✔ **Symptôme**
+
+- La demande OR créée via le formulaire web :
+  - crée bien une ligne en base dans la table `contrat`
+  - **mais le statut final est `CREE` au lieu de `DEMANDE_EN_LIGNE`**
+- Les logs montraient pourtant :
+  > "Contrat OR DEMANDE_EN_LIGNE créé avec succès"
+
+---
+
+✔ **Cause**
+
+Le statut était correctement positionné dans le service dématérialisé :
+
+```java
+contrat.setStatut(Statut.DEMANDE_EN_LIGNE);
+````
+
+Mais il était **écrasé plus tard** dans le service métier central :
+
+```java
+if (contrat.getId() == null) {
+    addStatut(contrat);
+}
+```
+
+Avec la méthode :
+
+```java
+private void addStatut(Contrat contrat) {
+    contrat.setStatut(Statut.CREE);  // écrase le statut existant
+}
+```
+
+➡️ Cette logique historique supposait que **toute création de contrat commençait en `CREE`**, ce qui n’est plus valable pour le canal web.
+
+---
+
+✔ **Solution**
+
+Ne définir le statut par défaut **que s’il n’est pas déjà initialisé** :
+
+```java
+private void addStatut(Contrat contrat) {
+    if (contrat.getStatut() == null) {
+        contrat.setStatut(Statut.CREE);
+    }
+    contrat.setImprEtiquette(false);
+    contrat.setImprFicheRecap(false);
+}
+```
+
+---
+
+✔ **Résultat**
+
+* Création bureau → `CREE`
+* Création dématérialisée → `DEMANDE_EN_LIGNE`
+* Aucun impact sur le workflow existant
+* Le statut final en base est désormais conforme à la logique métier
+
+---
 ## Conclusion
 
 Le backend OR dématérialisé :
