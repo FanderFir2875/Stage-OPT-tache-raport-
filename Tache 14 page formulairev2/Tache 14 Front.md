@@ -1,235 +1,266 @@
-# Documentation technique – Backend OR Physique → Physique
+# Documentation technique – Frontend OR Physique → Physique
 
-##  Objectif
+### (Suite du document Backend)
 
-Implémenter la logique serveur permettant :
+## Objectif
 
-* de recevoir une demande OR en JSON depuis le frontend
-* de valider les données
-* de vérifier les règles métiers
-* de transformer les données en entité persistable
-* de stocker la demande en base
-* de retourner une réponse HTTP cohérente
+Mettre en place l’interface Angular permettant :
+
+* de saisir une demande d’Ordre de Réexpédition (OR)
+* de rechercher une adresse via **REFloc**
+* de sélectionner les adresses *Ancienne* et *Nouvelle*
+* de valider dynamiquement les champs
+* de soumettre les données au backend
+
+Ce document décrit la **conception**, **l’architecture**, **les composants**, et les **choix techniques** réalisés.
 
 ---
 
-# Représentation des données reçues (DTO d’entrée)
+# 1. Architecture front – Vue d’ensemble
 
-Nous avons créé `OrDematRequestDTO`, qui représente le JSON reçu depuis le frontend :
+Le front est développé en **Angular + JHipster**, avec :
 
-```java
-@Data
-public class OrDematRequestDTO {
+* Composant principal : `FormulaireOrComponent`
+* Services :
 
-    private String dateDebut;
-    private String dateFin;
+  * `OrDematService` → envoi de la demande au backend
+  * `ReflocService` → recherche d’adresses
+* Formulaire piloté via **FormGroup + FormControl**
+* Validation en temps réel côté Angular
+* Autocomplétion REFloc
 
-    private String demandeurNom;
-    private String demandeurPrenom;
-    private String demandeurEmail;
-    private String demandeurTelephone;
+Schéma logique simplifié :
 
-    private JsonNode ancienneAdresse;
-    private JsonNode nouvelleAdresse;
+```
+Utilisateur → Formulaire Angular → ReflocService → Backend /api/refloc → SIG
+                                     ↓
+                          Données sélectionnées → Patch du FormGroup
+                                     ↓
+                               Envoi final → /api/demat/or-physique
+```
+
+---
+
+# 2. Structure du formulaire Angular
+
+Le composant `FormulaireOrComponent` expose un **FormGroup complet** :
+
+```ts
+this.formulaireOr = this.fb.group({
+  dateDebut: ['', Validators.required],
+  dateFin: ['', Validators.required],
+
+  demandeurNom: ['', Validators.required],
+  demandeurPrenom: ['', Validators.required],
+  demandeurEmail: ['', [Validators.required, Validators.email]],
+  demandeurTelephone: [''],
+
+  // Champs spécifiques au REFloc (barres de recherche)
+  rechercheAncienne: [''],
+  rechercheNouvelle: [''],
+
+  ancienneAdresse: this.fb.group({
+    numEtVoie: ['', Validators.required],
+    ville: ['', Validators.required],
+    codePostal: ['', Validators.required],
+  }),
+
+  nouvelleAdresse: this.fb.group({
+    numEtVoie: ['', Validators.required],
+    ville: ['', Validators.required],
+    codePostal: ['', Validators.required],
+  }),
+});
+```
+
+### Points importants :
+
+* Les champs `rechercheAncienne` et `rechercheNouvelle` sont **hors** des FormGroup `ancienneAdresse` / `nouvelleAdresse`.
+* Les données REFloc sélectionnées sont patchées automatiquement dans les sous-groupes.
+
+---
+
+# 3. Composant HTML – affichage & interactions
+
+Chaque zone adresse contient :
+
+1. **Un champ de recherche REFloc**
+2. **Une liste dynamique de suggestions**
+3. **Les champs renseignés après sélection**
+
+Ex. pour l'ancienne adresse :
+
+```html
+<!-- Champ de recherche REFloc -->
+<input type="text" class="form-control"
+       formControlName="rechercheAncienne"
+       (input)="searchReflocAncienne($any($event.target).value)"
+       placeholder="Commencez à taper une adresse..." />
+
+<!-- Suggestions -->
+<ul class="list-group mt-1" *ngIf="suggestionsAncienne?.length">
+  <li class="list-group-item list-group-item-action"
+      *ngFor="let adresse of suggestionsAncienne"
+      (click)="selectAncienneAdresse(adresse)">
+    {{ adresse.display }}
+  </li>
+</ul>
+
+<!-- Groupe ancienAdresse -->
+<div formGroupName="ancienneAdresse">
+  <input formControlName="numEtVoie" />
+  <input formControlName="ville" />
+  <input formControlName="codePostal" />
+</div>
+```
+
+---
+
+# 4. Service REFloc – Intégration côté frontend
+
+Le service Angular **ne contacte pas SIG directement**.
+
+Il interroge l’endpoint backend :
+
+```
+POST /api/refloc
+```
+
+### Code complet du service :
+
+```ts
+search(query: string, typeAdresse: string = "ADRESSE_DOMICILE_NC") {
+  if (!query || query.length < 3) return of([]);
+
+  const body = { q: query, typeAdresse };
+
+  return this.http.post<any[]>(this.API_URL, body).pipe(
+    map(items =>
+      items.map(item => ({
+        display: item.adresseFormatee?.replace('\n', ' ') 
+             || `${item.numEtVoie} ${item.codePostal} ${item.ville}`,
+        numEtVoie: item.numEtVoie,
+        ville: item.ville,
+        codePostal: item.codePostal
+      }))
+    )
+  );
 }
 ```
 
-Ce DTO ne correspond pas 1:1 au modèle BDD, mais au **format envoyé par le frontend**.
+### Choix techniques :
+
+* mapping simplifié pour le front
+* suppression des retours à la ligne
+* fallback si `adresseFormatee` n’est pas fournie
 
 ---
 
-# Entité persistée en base
+# 5. Sélection d’une adresse REFloc
 
-Notre modèle stocké en BDD est `DemandeOr`
+Lorsqu’une suggestion est cliquée, elle est automatiquement réinjectée dans le formulaire :
 
-```java
-@Entity
-@Table(name = "demande_or")
-public class DemandeOr extends AbstractAuditingEntity {
+```ts
+selectAncienneAdresse(adresse: any): void {
+  this.formulaireOr.patchValue({
+    ancienneAdresse: {
+      numEtVoie: adresse.numEtVoie,
+      ville: adresse.ville,
+      codePostal: adresse.codePostal
+    },
+    rechercheAncienne: ''  // efface la barre de recherche
+  });
 
-    @Id
-    @GeneratedValue(...)
-    private Long id;
-
-    private Instant dateDebut;
-    private Instant dateFin;
-
-    @Type(type = "jsonb")
-    @Column(name = "data", columnDefinition = "TEXT", nullable = false)
-    private JsonNode data;
+  this.suggestionsAncienne = [];
 }
 ```
 
-Important :
-Toutes les infos client (nom, adresse, tel, etc.) sont stockées dans `data` (format JSON-B).
+### Fonctionnalités :
+
+✔ Remplissage automatique des champs
+✔ Nettoyage de la zone de recherche
+✔ Fermeture de la liste de suggestions
 
 ---
 
-# Validation métier dans le service
+# 6. Impasses rencontrées (résolution des bugs)
 
-La logique métier se trouve dans `OrDematService.createDemandeOr()`.
+Voici les principales difficultés rencontrées et leurs solutions :
 
-Voici le contenu essentiel :
+### ❌ **CORS & accès SIG refusé**
 
-```java
-public DemandeOr createDemandeOr(OrDematRequestDTO dto) {
+➡ aucun appel direct SIG possible depuis Angular
+✔ solution : passer par le backend `/api/refloc`
 
-    if (dto.getDateDebut() == null)
-        throw new IllegalArgumentException("La date de début est obligatoire.");
-    if (dto.getDateFin() == null)
-        throw new IllegalArgumentException("La date de fin est obligatoire.");
-    if (dto.getAncienneAdresse() == null)
-        throw new IllegalArgumentException("L'adresse de départ est obligatoire.");
-    if (dto.getNouvelleAdresse() == null)
-        throw new IllegalArgumentException("L'adresse d'arrivée est obligatoire.");
+### ❌ **401 Unauthorized sur le backend**
 
-    LocalDate debut = Instant.parse(dto.getDateDebut()).atZone(ZoneId.of("Pacific/Noumea")).toLocalDate();
-    LocalDate now = LocalDate.now(ZoneId.of("Pacific/Noumea"));
+✔ solution : connexion via Angular → JWT automatique par JHipster
 
-    if (debut.isBefore(now))
-        throw new IllegalArgumentException("La date de début doit être postérieure ou égale à la date du jour.");
+### ❌ **Suggestions REFloc affichées en lignes blanches**
 
-    if (dto.getAncienneAdresse().toString().equals(dto.getNouvelleAdresse().toString()))
-        throw new IllegalArgumentException("L’adresse de départ doit être différente de l’adresse d’arrivée.");
+✔ cause : mauvais mapping des champs (`voie`, `postal`, etc.)
+✔ solution : utiliser `adresseFormatee`, `numEtVoie`, `ville`, `codePostal`
 
-    DemandeOr demandeOr = demandeOrMapper.toEntity(dto);
-    return demandeOrService.save(demandeOr);
-}
-```
+### ❌ **PatchValue ne remplissait rien**
 
-Nous appliquons les règles métier suivantes :
+✔ solution : utiliser les bons champs du résultat REFloc
 
-✔ Champs obligatoires
-✔ Dates valides
-✔ Adresse départ ≠ Adresse arrivée
-✔ Date début ≥ date du jour
+### ❌ **Barre de recherche impossible à vider**
+
+✔ solution : ajouter formControlName `rechercheAncienne` / `rechercheNouvelle`
+
+### ❌ **Erreur Angular : Cannot find control with path**
+
+✔ cause : input de recherche placé dans `formGroupName`
+✔ solution : déplacer le champ en dehors du FormGroup
+
+Tous ces correctifs ont permis d’obtenir un formulaire stable et fonctionnel.
 
 ---
 
-# Construction de la structure JSON stockée en base
+# 7. Soumission finale au backend
 
-Le mapper MapStruct convertit :
+Lors du clic sur “Valider”, le composant construit le payload final :
 
-```java
-public abstract DemandeOr toEntity(OrDematRequestDTO dto);
+```ts
+const payload = {
+  ...formValue,
+  dateDebut: formValue.dateDebut + "T00:00:00Z",
+  dateFin: formValue.dateFin + "T00:00:00Z"
+};
 ```
 
-Pour créer l'entité DemandeOr :
-
-* dateDebut → `Instant`
-* dateFin → `Instant`
-* toutes les autres infos → regroupées dans `data`
-
-Cela donne un stockage BDD du type :
-
-```json
-{
-  "demandeurNom": "Dupont",
-  "demandeurPrenom": "Pierre",
-  "demandeurEmail": "pierre@example.com",
-  "demandeurTelephone": "505050",
-  "ancienneAdresse": { ... },
-  "nouvelleAdresse": { ... }
-}
-```
-
----
-
-# Sauvegarde en base
-
-Effectuée via :
-
-```java
-DemandeOr saved = demandeOrService.save(demandeOr);
-```
-
-qui appelle le repository :
-
-```java
-demandeOrRepository.save(demandeOr);
-```
-
----
-
-# Réponse HTTP envoyée au frontend
-
-En cas de succès :
-
-```
-201 CREATED
-```
-
-Exemple de retour :
-
-```json
-{
-  "id": 42,
-  "message": "Ordre de réexpédition créé avec succès"
-}
-```
-
-En cas d’erreur :
-
-```
-400 BAD REQUEST
-```
-
-Exemple :
-
-```json
-{
-  "message": "L’adresse de départ doit être différente de l’adresse d’arrivée."
-}
-```
-
----
-
-# POSTMAN example
+Puis envoie à l’endpoint :
 
 ```
 POST /api/demat/or-physique
-Content-Type: application/json
 ```
 
-```json
-{
-  "dateDebut": "2025-05-12T00:00:00Z",
-  "dateFin": "2026-05-01T00:00:00Z",
-  "demandeurNom": "Dupont",
-  "demandeurPrenom": "Pierre",
-  "demandeurEmail": "pierre@example.com",
-  "demandeurTelephone": "505050",
-  "ancienneAdresse": { ... },
-  "nouvelleAdresse": { ... }
-}
-```
+Le backend valide :
+
+* dates cohérentes
+* adresses différentes
+* présence des champs obligatoires
+
+Et enregistre la demande.
 
 ---
 
-# Fonctionnalités backend finalisées
+# 8. Fonctionnalités front finalisées
 
-## Implémentées :
-
-✔ validation obligatoire des champs
-✔ validation adresse différente
-✔ validation date début ≥ date du jour
-✔ validation date fin ≥ date début
-✔ stockage JSONB
-✔ logs lisibles et détaillés
-✔ gestion des exceptions REST
-✔ endpoint fonctionnel
+✔ Recherche REFloc
+✔ Autocomplétion dynamique
+✔ Patch automatique des adresses
+✔ Formulaire réactif complet
+✔ Validations Angular + backend
+✔ Gestion propre de l’affichage
 
 ---
+# **Conclusion**
 
-# Ce qu’il reste à faire (prochaines étapes FRONT)
+Le frontend OR Physique → Physique est désormais entièrement fonctionnel :
+connexion avec le backend, gestion FORM + REFloc, validation, sélection d’adresses et envoi final.
 
-* ajout autocomplete REFloc sur champs adresse
-* affichage des messages d’erreur sous les champs
-* blocage du bouton tant que formulaire invalide
-* formatage des dates vers `Instant`
-* affichage du message succès validation
-
----
-
+Cette conception garantit une UX fluide, cohérente avec les règles métiers, et parfaitement alignée avec l’applicatif SIOR.
 
 
